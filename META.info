@@ -1,0 +1,12 @@
+{
+    "name" : "Avro",
+    "version" : "0.01",
+    "description" : "Perl6 Avro",
+    "author" : "Adriaan Larmuseau",
+    "source-url" : "",
+    "depends" : ["JSON::Tiny"],
+    "provides" : {
+      "Avro": "lib/Avro.pm",
+    },
+}
+
