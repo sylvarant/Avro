@@ -4,7 +4,7 @@ use lib 'lib';
 use Avro; 
 use JSON::Tiny;
 
-plan 31;
+plan 33;
 
 #======================================
 # Test :: Primitive Types
@@ -104,6 +104,33 @@ try {
   $parsed = 1;
 }
 ok $parsed, "Correct default accepted";
+
+# test faulty names
+my $name_ex1 = Q<<{
+ "type": "record",
+ "name": "2User",
+ "fields": [
+     {"name": "name", "type": "string", "default" : "hello" }
+ ]
+}>>;
+$parsed = 0;
+{
+  parse-schema($name_ex1);
+  CATCH {
+    when X::Avro::FaultyName {  $parsed = 1; }
+    default { say $_.message();  $parsed = 0; }
+  }
+}
+nok $parsed, "Incorrect name rejected";
+
+my $name_ex2 = Q<<{
+ "namespace" : "Avro.Me",
+ "type": "record",
+ "name": "Hello.User",
+ "fields": [
+     {"name": "name", "type": "string", "default" : "hello" } ]}>>;
+my Avro::Record $nr = parse-schema($name_ex2);
+is $nr.namespace(),"Hello","Fullname name space identified";
 
 
 #======================================

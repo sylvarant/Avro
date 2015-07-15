@@ -28,6 +28,11 @@ package Avro {
     method message { "This Avro Schema requires a name" }
   }
 
+  class X::Avro::FaultyName is Avro::AvroException {
+    has Str $.source;
+    method message { "Not a valid Avro Name $!source" }
+  }
+
   class X::Avro::Record is Avro::AvroException {
     has Str $.note;
     method message { "Not a valid Record Schema, $!note" }
@@ -143,14 +148,25 @@ package Avro {
     has Str $.namespace;
     has Str $.fullname;
 
+    method valid_name (Str $str --> Bool) { 
+      Bool($str ~~ /<[A..Za..z_]><[A..Za..z0..9_]>+/) 
+    }
+
     submethod BUILD(Associative :$hash){
       X::Avro::MissingName.new().throw() unless $hash{'name'}:exists;
       $!namespace = ""; 
       $!name = $hash{'name'};
       $!fullname = $!name;
 
-      # namespace
-      if $hash{'namespace'}:exists {
+      my List $ls = $!name.split('.');
+      for $ls.values -> $n {
+        X::Avro::FaultyName.new(:source($n)).throw() unless self.valid_name($n);
+      }
+      if $ls.elems() > 1 {
+        $!name = $ls[$ls.end()];
+        $!namespace = ($ls[0..($ls.end()-1)]).join(".");
+      }
+      elsif $hash{'namespace'}:exists {
         $!namespace = $hash{'namespace'}; 
         $!fullname = $!namespace ~ "." ~ $!fullname;
       }
@@ -179,8 +195,14 @@ package Avro {
     has Order $.order;
 
     submethod BUILD(Associative :$hash){
+      
+      # input check
       X::Avro::Field.new(:note("Missing type and/or name")).throw() 
         unless $hash{'name'} and $hash{'type'}; 
+      X::Avro::FaultyName.new(:source($hash{'name'})).throw() 
+        unless NamedComplex.valid_name($hash{'name'});
+
+      # attributes
       $!name = $hash{'name'};
       $!type = parse($hash{'type'});
       $!order = Order::ascending;
@@ -195,6 +217,8 @@ package Avro {
             unless $!type.is_valid_default($!default); 
           $!native{'default'} = $!default;
       }
+
+      # build native representation
       my Str $o = order_str($!order);
       $!native = { 'name' => $!name, 'type' => $!type.native() , 'order' => $o}; 
       $!native{'aliases'} = self.aliases() if self.aliases.defined;
