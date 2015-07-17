@@ -1,16 +1,15 @@
 =begin pod
-=head1 JSON::Tiny
-C<JSON::Tiny> is a minimalistic module that reads and writes JSON.
-It supports strings, numbers, arrays and hashes (no custom objects).
-=head1 Synopsis
-    use JSON::Tiny;
-    my $json = to-json([1, 2, "a third item"]);
-    my $copy-of-original-data-structure = from-json($json);
+=head1 Avro
+C<Avro> is a minimalistic module that encodes and decode Avro.
+It supports JSON and Binary decoding/encoding.
 =end pod
 
 use v6;
 use JSON::Tiny;
 use Avro::Schema;
+use Avro::Encode;
+use Avro::Decode;
+use Avro::Datafile;
 use Avro::Auxiliary;
 
 

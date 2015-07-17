@@ -21,7 +21,7 @@ package Avro {
 
   class X::Avro::Primitive is Avro::AvroException {
     has Str $.source;
-    method message { "Input $!source is not a valid primitive type" }
+    method message { "Input $!source is not a valid Primitive type" }
   }
 
   class X::Avro::MissingName is Avro::AvroException {
@@ -50,7 +50,7 @@ package Avro {
 
   class X::Avro::Array is Avro::AvroException {
     has Str $.note;
-    method message { "Not a valid Map Schema, $!note" }
+    method message { "Not a valid Array Schema, $!note" }
   }
 
   class X::Avro::Enum is Avro::AvroException {
@@ -213,8 +213,9 @@ package Avro {
       }
       if $hash{'default'}:exists {
           $!default = $hash{'default'};
-          X::Avro::Field.new(:note("Invalid default value: "~ ($hash{'default'}))).throw()  
-            unless $!type.is_valid_default($!default); 
+          my Bool $valid_def = $!type.is_valid_default($!default);
+          CATCH { default { X::Avro::Field.new(:note("Invalid default value: "~ ($hash{'default'}))).throw() }}
+          X::Avro::Field.new(:note("Invalid default value: "~ ($hash{'default'}))).throw()  unless $valid_def;
           $!native{'default'} = $!default;
       }
 
@@ -232,38 +233,64 @@ package Avro {
 
   class Primitive does Schema {
 
-    constant @primitive_types = <null boolean int long float double bytes string>; 
     has Str $.type;
 
-    sub is_primitive (Str $type --> Bool){
-      my $result = first-index { ($^a eq $type) }, @primitive_types; 
-      return $result.defined; 
-    }
-    
-    submethod BUILD(:$type){
-      $!type = $type;
-      X::Avro::Primitive.new(:source($type)).throw() unless is_primitive($type);
-      $!native = EnumMap.new("type",$type); 
-    }
-
     method native(--> EnumMap){
-      return $!native;
+      return EnumMap.new("type",self.type()); 
     }
 
-    method is_valid_data ($data){
-       return True; 
-    }
+    method is_valid_data ($data){ ... }
 
-    method is_valid_default(Cool:D $default){
-      given $!type {
-        when "string"   { $default ~~ Str }
-        when "boolean"  { $default ~~ Bool }
-        when "null"     { $default ~~ Any }
-        when "bytes"    { $default ~~ Str } #Todo unsigned
-        when "int" | "long"   { $default ~~ Int } 
-        when "float" | "double" { $default ~~ Rat }
-      }
-    }
+    method is_valid_default(Cool:D $default){ ... }
+
+  }
+
+  class String is Primitive { 
+    has Str $.type = "string";
+    method is_valid_default (Str:D $str) { True }
+    method is_valid_data (Str:D $str) { True }
+  }
+
+  class Boolean is Primitive {
+    has Str $.type = "boolean";
+    method is_valid_default (Bool:D $b) { True }
+    method is_valid_data (Bool:D $b) { True }
+  }
+
+  class Null is Primitive {
+    has Str $.type = "null";
+    method is_valid_default (Any:D $b) { True }
+    method is_valid_data (Any:D $b) { True }
+  }
+
+  class Bytes is Primitive {
+    has Str $.type = "bytes";
+    method is_valid_default (Str:D $str) { True }
+    method is_valid_data (Str:D $str) { True }
+  }
+
+  class Integer is Primitive {
+    has Str $.type = "int";
+    method is_valid_default (int:D $i) { True }
+    method is_valid_data (int:D $i) { True }
+  }
+
+  class Long is Primitive {
+    has Str $.type = "long";
+    method is_valid_default (int:D $l) { True }
+    method is_valid_data (int:D $l) { True }
+  }
+
+  class Float is Primitive {
+    has Str $.type = "float";
+    method is_valid_default (Rat:D $fl) { True }
+    method is_valid_data (Rat:D $fl) { True }
+  }
+
+  class Double is Primitive {
+    has Str $.type = "double";
+    method is_valid_default (Rat:D $fl) { True }
+    method is_valid_data (Rat:D $fl) { True }
   }
 
 
@@ -495,7 +522,7 @@ package Avro {
   multi sub parse (Associative $hash --> Avro::Schema) is export {
 
     my Str $ty = $hash{'type'};
-    return Avro::Primitive.new(:type($ty))if $hash.pairs == 1;
+    return parse($ty) if $hash.pairs == 1;
 
     given $ty {
     
@@ -518,8 +545,28 @@ package Avro {
   }
 
   multi sub parse(Str $str --> Avro::Schema) is export {
-    #TODO name recognition
-    return Avro::Primitive.new(:type($str));
+
+    given $str {
+
+      when "null"     { Avro::Null.new() }
+
+      when "boolean"  { Avro::Boolean.new() }
+
+      when "int"      { Avro::Integer.new() }
+
+      when "long"     { Avro::Long.new() }
+
+      when "float"    { Avro::Float.new() }
+
+      when "double"   { Avro::Double.new() }
+
+      when "bytes"    { Avro::Bytes.new() }
+
+      when "string"   { Avro::String.new() }
+    
+      default { X::Avro::Primitive.new(:source($str)).throw() }
+
+    }
   }
 
 }
