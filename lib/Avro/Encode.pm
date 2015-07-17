@@ -31,11 +31,15 @@ package Avro{
 
   class BinaryEncoder does Encoder { 
 
+    # int8 template "*" doesn't work as I expect it too
+    sub template(int $length) {
+      ((1..$length).map:{ "C" }).join(" ");
+    }
+
     # integers and longs are encode as variable sized zigzag numbers
     sub encode_long(int $l){
       my @var_int = to_varint(to_zigzag($l));  
-      my Str $template = ((1..@var_int.elems()).map:{ "C" }).join(" ");
-      pack($template,@var_int);
+      pack(template(@var_int.elems()),@var_int);
     }
 
 
@@ -53,9 +57,16 @@ package Avro{
       $handle.write(pack("C",0)); 
     }
 
-    multi submethod encode_schema(Avro::String $schema, IO::Handle $handle, Str:D $str) { * }
+    multi submethod encode_schema(Avro::String $schema, IO::Handle $handle, Str:D $str) { 
+      my Blob $encoding = $str.encode();
+      $handle.write(encode_long($encoding.elems())); 
+      $handle.write($encoding);
+    }
 
-    multi submethod encode_schema(Avro::Bytes $schema, IO::Handle $handle, Str:D $str) { * }
+    multi submethod encode_schema(Avro::Bytes $schema, IO::Handle $handle, Str:D $str) { 
+      $handle.write(encode_long($str.chars())); 
+      $handle.write(pack(template($str.chars()),$str.ords()))
+    }
 
     multi submethod encode_schema(Avro::Boolean $schema, IO::Handle $handle, Bool:D $bool) {  
       $handle.write(pack("C",$bool));

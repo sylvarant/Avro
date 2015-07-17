@@ -72,11 +72,18 @@ package Avro{
     }   
 
     multi submethod decode_schema(Avro::String $schema, IO::Handle $handle) { 
-      "todo" 
+      my int $size = decode_long($handle); 
+      my Blob $r = $handle.read($size);
+      $r.decode()
     }   
 
     multi submethod decode_schema(Avro::Bytes $schema, IO::Handle $handle) { 
-      "todo"
+      my int $size = decode_long($handle); 
+      my @arr = ();
+      for 1..$size -> $i {
+        push(@arr,$handle.read(1).unpack("C").chr);
+      }
+      @arr.join("");
     }   
 
     multi submethod decode_schema(Avro::Boolean $schema, IO::Handle $handle) {  

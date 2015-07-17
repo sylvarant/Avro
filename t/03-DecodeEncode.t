@@ -14,8 +14,8 @@ my $encoder = Avro::BinaryEncoder.new();
 my $decoder = Avro::BinaryDecoder.new();
 
 my @schemas = ( Avro::Boolean.new(), Avro::Boolean.new() , Avro::Null.new(), Avro::Integer.new(), 
-  Avro::Integer.new(), Avro::Long.new());
-my @datas = ( True, False, Any, 56, -668, (1 +< 60));
+  Avro::Integer.new(), Avro::Long.new(), Avro::Bytes.new(), Avro::String.new(), Avro::String.new());
+my @datas = ( True, False, Any, 56, -668, (1 +< 60),"00FF","Hello Me", 'møp');
 my @zipped = (@schemas Z @datas);
 
 plan +@schemas;
