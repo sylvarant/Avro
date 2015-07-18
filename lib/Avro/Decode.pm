@@ -106,7 +106,11 @@ package Avro{
     }   
 
     multi submethod decode_schema(Avro::Float $schema, IO::Handle $handle) { 
-      "todo" 
+      my @arr = ();
+      for 1..4 -> $i {
+        push(@arr,$handle.read(1).unpack("C"));
+      }
+      from_floatbits(int_from_bytes(@arr));
     }   
 
     multi submethod decode_schema(Avro::Double $schema, IO::Handle $handle) { 

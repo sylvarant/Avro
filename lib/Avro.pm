@@ -7,11 +7,7 @@ It supports JSON and Binary decoding/encoding.
 use v6;
 use JSON::Tiny;
 use Avro::Schema;
-use Avro::Encode;
-use Avro::Decode;
-use Avro::Datafile;
-use Avro::Auxiliary;
-
+use Avro::DataFile;
 
 module Avro:ver<0.01> {
 

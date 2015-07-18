@@ -82,7 +82,10 @@ package Avro{
 
     multi submethod encode_schema(Avro::Record $schema, IO::Handle $handle, Associative:D $hash) { * }   
 
-    multi submethod encode_schema(Avro::Float $schema, IO::Handle $handle, Rat:D $float) { * }
+    multi submethod encode_schema(Avro::Float $schema, IO::Handle $handle, Rat:D $float) { 
+      my @arr = int_to_bytes(to_floatbits($float),4);
+      $handle.write(pack(template(4),@arr));
+    }
 
     multi submethod encode_schema(Avro::Double $schema, IO::Handle $handle, Rat:D $double) { * }
 
