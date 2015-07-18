@@ -114,7 +114,11 @@ package Avro{
     }   
 
     multi submethod decode_schema(Avro::Double $schema, IO::Handle $handle) { 
-      "todo" 
+      my @arr = ();
+      for 1..8 -> $i {
+        push(@arr,$handle.read(1).unpack("C"));
+      }
+      from_doublebits(int_from_bytes(@arr));
     }   
 
     method decode(Avro::Schema $schema, IO::Handle $handle) {  

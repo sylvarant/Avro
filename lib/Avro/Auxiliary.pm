@@ -99,21 +99,22 @@ package Avro {
     return ($exp,$mantissa);
   }
 
-  # Java : floatToIntBits !temporary
-  sub to_floatbits(Rat $rat --> int) is export {
+  sub to_ieee(Int $nan, Int $inf, Int $ninf, Int $fsize, Int $expsize, 
+    Rat $rat --> Int) {
+
     given $rat {
   
-      when NaN {  0x7fc00000 }
+      when NaN { $nan }
 
-      when Inf { 0x7f800000 }
+      when Inf { $inf }
 
-      when -Inf { 0xff800000 }
+      when -Inf { $ninf }
 
       when 0 { 0 }
 
       default { 
 
-        my Rat $neutr = $rat.sign() == -1 ?? -$rat !! $rat;
+        my FatRat $neutr = $rat.sign() == -1 ?? -$rat.FatRat !! $rat.FatRat;
         my Int $nat = $neutr.truncate;
 
         # compute posible positive exp
@@ -125,19 +126,19 @@ package Avro {
         }
 
         # compute fraction bits
-        my Rat $comma = $neutr - ($neutr.truncate).Rat;
+        my FatRat $comma = $neutr - ($neutr.truncate).FatRat;
         my Int $fraction = 0;
         my $mask = 1;
         my $bytes = 0;
         my $neg = 0;
-        until $comma == 0.0 or (23 - $plus - $bytes) == 0  {
+        until $comma == 0.0 or ($fsize - $plus - $bytes) == 0  {
           $bytes++;
           $comma *= 2.0;
           if $comma.truncate > 0 {
            $neg = $bytes if $neg == 0; 
            $fraction = $fraction +| $mask;
           }
-          $comma = $comma - ($comma.truncate).Rat;
+          $comma = $comma - ($comma.truncate).FatRat;
           $mask = $mask +< 1;
         }
         my Int $final = 0;
@@ -149,20 +150,38 @@ package Avro {
         my $exp = $plus > 0 ?? $plus !! -$neg;
         $f = $f +| $final;
         $f = $f +| ( $nat +< $bytes);
-        $f = ($f +< (23 - $bytes - $exp)) +& 0x007fffff; 
-        $exp = ($exp + 127) +< 23;
-        my $result = 0; 
-        $result = $result +| 0x80000000 if $rat.sign() == -1;
+        $f = ($f +< ($fsize - $bytes - $exp)) +& ((1 +< $fsize) - 1); 
+        $exp = ($exp + ((2**($expsize-1)) -1)) +< $fsize;
+        my Int $result = 0; 
+        $result = $result +| (1 +< ($fsize + $expsize)) if $rat.sign() == -1;
         $result = $result +| $exp;
         $result = $result +| $f;
         return $result;
       }
 
     }
+
+  }
+
+#  my $float_convert = &to_ieee.assuming(nan => 0x7fc00000, inf => 0x7f800000, ninf => 0xff800000, 
+#    fsize => 23, expsize => 8);
+
+#  my $double_convert = &to_ieee.assuming(nan => 0x7ff8000000000000, inf => 0x7ff0000000000000, 
+#    ninf => 0xfff0000000000000, fsize => 52, expsize => 11);
+
+  
+  # Java : floatToIntBits !temporary
+  sub to_floatbits(Rat $rat --> Int) is export {
+    to_ieee(0x7fc00000,0x7f800000,0xff800000,23,8,$rat);
+  }
+
+  # Java : doubleToIntBits !temporary
+  sub to_doublebits(Rat $rat --> Int) is export {
+    to_ieee(0x7ff8000000000000,0x7ff0000000000000,0xfff0000000000000,52,11,$rat);
   }
 
   # read in bytes
-  sub from_floatbits(int $n --> Rat:D) is export {
+  sub from_floatbits(Int $n --> Rat:D) is export {
 
     given $n  {
 
@@ -187,6 +206,36 @@ package Avro {
          $iter = $iter +> 1;
         }
         $rat = $sign.Rat * $rat * (2**$exp).Rat; 
+      }
+    }
+  }
+
+  sub from_doublebits(Int $n --> Rat:D) is export {
+
+    given $n  {
+
+      when 0x7ff8000000000000 { NaN }
+
+      when 0x7ff0000000000000  { Inf }
+
+      when 0xfff0000000000000 { -Inf }
+
+      when 0 { 0 }
+
+      default {
+        my $sign = 1;
+        $sign = -1 if $n +& 0x8000000000000000;
+        my Int $exp = (($n +> 52) +& 0x7ff); 
+        $exp -= 1023;
+        my Int $fract = ($n +& 0x000fffffffffffff);
+        my FatRat $rat = 1.FatRat;
+        my $iter = $fract;
+        for (0..51) -> $i {
+         $rat += (2**($i - 52)) if $iter +& 0x1;
+         $iter = $iter +> 1;
+        }
+        $rat = $sign.FatRat * $rat * (2**$exp).FatRat; 
+        $rat.Rat;
       }
     }
   }

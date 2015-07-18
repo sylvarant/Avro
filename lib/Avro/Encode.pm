@@ -42,6 +42,7 @@ package Avro{
       pack(template(@var_int.elems()),@var_int);
     }
 
+    multi submethod encode_schema(Avro::Record $schema, IO::Handle $handle, Associative:D $hash) { * }   
 
     multi submethod encode_schema(Avro::Array $schema, IO::Handle $handle, Positional:D $arr) { * }   
 
@@ -80,14 +81,15 @@ package Avro{
       $handle.write(encode_long($long)); 
     }
 
-    multi submethod encode_schema(Avro::Record $schema, IO::Handle $handle, Associative:D $hash) { * }   
-
     multi submethod encode_schema(Avro::Float $schema, IO::Handle $handle, Rat:D $float) { 
       my @arr = int_to_bytes(to_floatbits($float),4);
       $handle.write(pack(template(4),@arr));
     }
 
-    multi submethod encode_schema(Avro::Double $schema, IO::Handle $handle, Rat:D $double) { * }
+    multi submethod encode_schema(Avro::Double $schema, IO::Handle $handle, Rat:D $double) {  
+      my @arr = int_to_bytes(to_doublebits($double),8); 
+      $handle.write(pack(template(8),@arr));
+    }
 
     method encode(Avro::Schema $schema, IO::Handle $handle, Mu $data) {  
       # TODO check handle?
