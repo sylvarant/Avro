@@ -31,6 +31,13 @@ package Avro{
 
   class BinaryEncoder does Encoder { 
 
+    has Int $!blocksize;
+
+    # constructor
+    submethod BUILD( :$blocksize = 250 ) { 
+      $!blocksize = $blocksize;
+    }
+
     # int8 template "*" doesn't work as I expect it too
     sub template(int $length) {
       ((1..$length).map:{ "C" }).join(" ");
@@ -42,20 +49,71 @@ package Avro{
       pack(template(@var_int.elems()),@var_int);
     }
 
-    multi submethod encode_schema(Avro::Record $schema, IO::Handle $handle, Associative:D $hash) { * }   
+    multi submethod encode_schema(Avro::Record $schema, IO::Handle $handle, Associative:D $hash) { 
+    #   X::Avro::EncodeFail.new(:schema($schema),:data($hash)).throw() 
+    #    unless $schema.is_valid_default($hash);
+      for $schema.fields.list -> $field {
+        my $data = $hash{$field.name};
+        self.encode_schema($field.type,$handle,$data);
+      }
+    }   
 
-    multi submethod encode_schema(Avro::Array $schema, IO::Handle $handle, Positional:D $arr) { * }   
+    # encode an array in blocks of max size $!blocksize
+    multi submethod encode_schema(Avro::Array $schema, IO::Handle $handle, Positional:D $arr) { 
+      my @copy = $arr.clone();
+      my Int $iterations = ($arr.elems() div $!blocksize);
+      my Int $leftover = $arr.elems() mod $!blocksize;
+      my @blocks = (1..$iterations).map:{ $!blocksize }; 
+      push(@blocks, $leftover) if ($leftover > 0);
+      for @blocks -> $size {
+        $handle.write(encode_long($size));
+        for 1..$size {
+          self.encode_schema($schema.items,$handle,@copy.shift);
+        }
+      }
+      $handle.write(encode_long(0));
+    }   
 
-    multi submethod encode_schema(Avro::Map $schema, IO::Handle $handle, Associative:D $hash) { * } 
+    # todo set maps with negative counts ?
+    multi submethod encode_schema(Avro::Map $schema, IO::Handle $handle, Associative:D $hash) { 
+      my Avro::Schema $keyschema = Avro::String.new();
+      my @kv = $hash.kv;
+      my Int $iterations = ($hash.elems() div $!blocksize);
+      my Int $leftover = $hash.elems() mod $!blocksize;
+      my @blocks = (1..$iterations).map:{ $!blocksize }; 
+      push(@blocks, $leftover) if ($leftover > 0);
+      for @blocks -> $size {
+        $handle.write(encode_long($size));
+        for (1..$size) -> $i {
+          self.encode_schema($keyschema,$handle,@kv.shift);  
+          self.encode_schema($schema.values,$handle,@kv.shift);
+        }
+      }
+      $handle.write(encode_long(0));
+    } 
 
-    multi submethod encode_schema(Avro::Enum $schema, IO::Handle $handle, Str:D $str) { * } 
+    multi submethod encode_schema(Avro::Enum $schema, IO::Handle $handle, Str:D $str) { 
+      my Int $result = $schema.sym.first-index: { ($^a eq $str) }; 
+      if $result.defined {
+        $handle.write(encode_long($result));
+      } else { X::Avro::EncodeFail.new(:schema($schema),:data($str)).throw()  }
+    } 
 
-    multi submethod encode_schema(Avro::Union $schema, IO::Handle $handle, Mu:D $data) { * }
+    multi submethod encode_schema(Avro::Union $schema, IO::Handle $handle, Mu $data) { 
+      my Avro::Schema $type = $schema.find_type($data);
+      my Int $index = $schema.types.first-index: { ($^a ~~ $type) };
+      $handle.write(encode_long($index));
+      self.encode_schema($type,$handle,$data);
+    }
 
-    multi submethod encode_schema(Avro::Fixed $schema, IO::Handle $handle, Mu:D $data) { * }
+    multi submethod encode_schema(Avro::Fixed $schema, IO::Handle $handle, Str:D $str) { 
+      X::Avro::EncodeFail.new(:schema($schema),:data($str)).throw() 
+        unless $schema.size == $str.codes(); 
+      $handle.write(pack(template($schema.size),$str.ords()));
+    }
 
-    multi submethod encode_schema(Avro::Null $schema, IO::Handle $handle, Mu:U $any) { 
-      $handle.write(pack("C",0)); 
+    multi submethod encode_schema(Avro::Null $schema, IO::Handle $handle, Any:U $any) { 
+       # $handle.write(pack("C",0));  --> misinterpretation
     }
 
     multi submethod encode_schema(Avro::String $schema, IO::Handle $handle, Str:D $str) { 
@@ -65,8 +123,8 @@ package Avro{
     }
 
     multi submethod encode_schema(Avro::Bytes $schema, IO::Handle $handle, Str:D $str) { 
-      $handle.write(encode_long($str.chars())); 
-      $handle.write(pack(template($str.chars()),$str.ords()))
+      $handle.write(encode_long($str.codes())); 
+      $handle.write(pack(template($str.codes()),$str.ords()))
     }
 
     multi submethod encode_schema(Avro::Boolean $schema, IO::Handle $handle, Bool:D $bool) {  

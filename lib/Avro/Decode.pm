@@ -42,33 +42,64 @@ package Avro{
     }
 
     multi submethod decode_schema(Avro::Record $schema, IO::Handle $handle) { 
-      "todo" 
+      my %hash;
+      for $schema.fields.list -> $field {
+        %hash{$field.name} = self.decode_schema($field.type,$handle);
+      }
+      return %hash;
     }   
 
     multi submethod decode_schema(Avro::Array $schema, IO::Handle $handle) { 
-      "todo" 
+      my Int $size = decode_long($handle);
+      my @arr = ();
+      while $size {
+        for (1..$size) -> $i {
+          push(@arr,self.decode_schema($schema.items,$handle));  
+        }
+        $size = decode_long($handle);
+      } 
+      return @arr
     }   
 
     multi submethod decode_schema(Avro::Map $schema, IO::Handle $handle) { 
-      "todo" 
+      my Int $size = decode_long($handle);
+      my %hash;
+      my Avro::Schema $keyschema = Avro::String.new();
+      while $size {
+        for (1..$size) -> $i {
+          my Str $key = self.decode_schema($keyschema,$handle);
+          my $data = self.decode_schema($schema.values,$handle);
+          %hash{$key} = $data;
+        }
+        $size = decode_long($handle);
+      }
+      return %hash;
     }   
 
     multi submethod decode_schema(Avro::Enum $schema, IO::Handle $handle) { 
-      "todo" 
+      my int $result = decode_long($handle);
+      $schema.sym[$result];
     }   
 
     multi submethod decode_schema(Avro::Union $schema, IO::Handle $handle) { 
-      "todo" 
+      my Int $num = decode_long($handle);
+      my Avro::Schema $type = $schema.types[$num];
+      self.decode_schema($type,$handle);
     }   
 
     multi submethod decode_schema(Avro::Fixed $schema, IO::Handle $handle) { 
-      "todo" 
+      my @arr = ();
+      for (1..$schema.size) -> $i {
+        push(@arr,$handle.read(1).unpack("C").chr);
+      }
+      @arr.join("");
     }   
 
     multi submethod decode_schema(Avro::Null $schema, IO::Handle $handle) { 
-      my $r = $handle.read(1).unpack("C"); 
-      if $r == 0 { Any }
-      else { X::Avro::DecodeFail.new(:schema($schema)).throw()  }
+      #my $r = $handle.read(1).unpack("C"); 
+      #if $r == 0 { Any }
+      #else { X::Avro::DecodeFail.new(:schema($schema)).throw()  }
+      Any 
     }   
 
     multi submethod decode_schema(Avro::String $schema, IO::Handle $handle) { 

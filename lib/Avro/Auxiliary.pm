@@ -11,6 +11,26 @@ package Avro {
     method message { "Something went wrong" }
   }
 
+
+  #======================================
+  # improved .Str
+  #  -- resolves silly warnings
+  #======================================
+  
+  proto to_str(Mu --> Str) is export { * }
+   
+  multi sub to_str(Associative:D $hash)  {
+    ($hash.kv.map: -> $k,$v { to_str($k) ~ " => " ~ to_str($v) }).join(",");
+  }
+
+  multi sub to_str(Positional:D $arr) {
+    "[" ~ ($arr.list.map: -> $v {to_str($v)}).join(",") ~ "]"
+  }
+
+  multi sub to_str(Mu $data) {
+    ($data.gist() ~~ Any.gist() ?? "Any" !! $data.Str)
+  }
+
   #======================================
   # Low-level representations
   #======================================

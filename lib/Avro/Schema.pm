@@ -76,9 +76,9 @@ package Avro {
   role Schema {
     has Iterable $!native;
     method native(--> Iterable) { return $!native; } 
-    method is_valid_data($data) { ... } 
     method to_json(--> Str) { to-json(self.native()); }
-    method is_valid_default(Mu:D --> Bool) { ... }
+    method is_valid_default(Mu --> Bool) { ... }
+    method type(--> Str) { ... }
   }
 
   # parse produces Schema
@@ -149,7 +149,7 @@ package Avro {
     has Str $.fullname;
 
     method valid_name (Str $str --> Bool) { 
-      Bool($str ~~ /<[A..Za..z_]><[A..Za..z0..9_]>+/) 
+      Bool($str ~~ /<[A..Za..z_]><[A..Za..z0..9_]>*/) 
     }
 
     submethod BUILD(Associative :$hash){
@@ -239,8 +239,6 @@ package Avro {
       return EnumMap.new("type",self.type()); 
     }
 
-    method is_valid_data ($data){ ... }
-
     method is_valid_default(Cool:D $default){ ... }
 
   }
@@ -248,49 +246,41 @@ package Avro {
   class String is Primitive { 
     has Str $.type = "string";
     method is_valid_default (Str:D $str) { True }
-    method is_valid_data (Str:D $str) { True }
   }
 
   class Boolean is Primitive {
     has Str $.type = "boolean";
     method is_valid_default (Bool:D $b) { True }
-    method is_valid_data (Bool:D $b) { True }
   }
 
   class Null is Primitive {
     has Str $.type = "null";
-    method is_valid_default (Any:D $b) { True }
-    method is_valid_data (Any:D $b) { True }
+    method is_valid_default (Any:U $b) { True }
   }
 
   class Bytes is Primitive {
     has Str $.type = "bytes";
     method is_valid_default (Str:D $str) { True }
-    method is_valid_data (Str:D $str) { True }
   }
 
   class Integer is Primitive {
     has Str $.type = "int";
     method is_valid_default (int:D $i) { True }
-    method is_valid_data (int:D $i) { True }
   }
 
   class Long is Primitive {
     has Str $.type = "long";
     method is_valid_default (int:D $l) { True }
-    method is_valid_data (int:D $l) { True }
   }
 
   class Float is Primitive {
     has Str $.type = "float";
     method is_valid_default (Rat:D $fl) { True }
-    method is_valid_data (Rat:D $fl) { True }
   }
 
   class Double is Primitive {
     has Str $.type = "double";
     method is_valid_default (Rat:D $fl) { True }
-    method is_valid_data (Rat:D $fl) { True }
   }
 
 
@@ -300,9 +290,9 @@ package Avro {
 
   class Array does Schema {
     
-    has Avro::Schema $.items;
-
     constant type = 'array';
+
+    has Avro::Schema $.items;
     
     submethod BUILD(:$hash){
       X::Avro::Array.new(:note("Requires values")).throw() unless $hash{'items'}:exists;
@@ -315,15 +305,13 @@ package Avro {
       return $!native;
     }
 
-    method is_valid_data (Positional:D $data){
-      for $data.values -> $item {
-        return False unless $!items.is_valid_data($item);
+    method is_valid_default(Positional:D $array){ 
+      for $array.values -> $item {
+        return False unless $!items.is_valid_default($item);
       }
     }
 
-    method is_valid_default(Positional:D $array){ 
-      return self.is_valid_data($array);
-    }
+    method type (--> Str) { type }
 
   }
 
@@ -334,9 +322,9 @@ package Avro {
 
   class Map does Schema {
 
-    has Avro::Schema $.values;
-
     constant type = 'map';
+
+    has Avro::Schema $.values;
 
     submethod BUILD(Associative :$hash){
       X::Avro::Schema.new(:note("Requires values")).throw() unless $hash{'values'}:exists;
@@ -349,15 +337,13 @@ package Avro {
       return $!native;
     }
 
-    method is_valid_data (Associative:D $data){
-      for $data.values -> $item {
-        return False unless $!values.is_valid_data($item);
+    method is_valid_default(Associative:D $hash) { 
+      for $hash.values -> $item {
+        return False unless $!values.is_valid_default($item);
       }
     }
 
-    method is_valid_default(Associative:D $hash) { 
-      return self.is_valid_data($hash);
-    }
+    method type (--> Str) { type }
 
   }
 
@@ -368,6 +354,8 @@ package Avro {
 
   class Union does Schema {
 
+    constant type = "union";
+
     has List $.types;
 
     submethod BUILD(Positional :$types){
@@ -377,11 +365,13 @@ package Avro {
         X::Avro::Union.new("Union not permitted") if $schema ~~ Avro::Union;
         if $schema ~~ Avro::NamedComplex {
           my Str $resolved = $schema.WHAT.gist ~ $schema.fullname(); #TODO resolve aliases
-          X::Avro::Union.new(:note("Duplicate Complex type of name: "~$schema.name())).throw()  if %encountered{$resolved}:exists;
+          X::Avro::Union.new(:note("Duplicate Complex type of name: "~$schema.name())).throw()
+            if %encountered{$resolved}:exists;
           %encountered{$resolved} = 1;
         } else {
           my Str $key = $schema.WHAT.gist ~ ($schema.?type().gist);
-          X::Avro::Union.new(:note("Duplicate Primitive type: "~$key)).throw()  if %encountered{$key}:exists;
+          X::Avro::Union.new(:note("Duplicate Primitive type: "~$key)).throw()  
+            if %encountered{$key}:exists;
           %encountered{$key} = 1;
         }
       }
@@ -392,16 +382,23 @@ package Avro {
       return $!native;
     }
 
-    method is_valid_data (Mu:D $data){
+    method find_type (Mu $data --> Avro::Schema){
+      #what about overlapping data types?
       for $!types.values -> $type {
-        return True if $type.is_valid_default($data);
+          my Bool $valid_def = False;
+          try {
+            $valid_def = $type.is_valid_default($data);
+          }
+          return $type if $valid_def;
       }
-      return False;
+      X::Avro::Union.new(:note("Type not found for "~$data)).throw();
     }
 
     method is_valid_default(Mu:D $value){
       $!types[0].is_valid_default($value);
     }
+
+    method type (--> Str) { type }
 
   }
 
@@ -417,14 +414,15 @@ package Avro {
     also does Documented;
 
     constant type = "record";
-    has List $!fields;
+
+    has List $.fields;
 
     sub create_field(Associative:D $hash --> Avro::Field) { Avro::Field.new(:hash($hash)) }
 
     submethod BUILD(Associative:D :$hash){
       X::Avro::Record.new(:note("Missing Fields!")).throw() 
         unless $hash{'fields'}:exists;
-      my List $ls = $hash{'fields'}.values;
+      my List $ls = $hash{'fields'};
       $!fields = $ls.map: { create_field($_) }; 
       $break_lazy = $!fields.elems(); #force the computations --> this perl6 lazy map is obnoxius
       my $nativesf = $!fields.map:{ $_.native() };
@@ -437,13 +435,12 @@ package Avro {
       }
     }
 
-    method is_valid_data ($data){
-      return True;
-    }
-    
+    # determined by subset of names
     method is_valid_default(Associative:D $hash){
-      return self.is_valid_data($hash);
+      ($!fields.map: { $_.name }) ⊆ $hash.keys();
     }
+
+    method type (--> Str) { type }
      
   }
 
@@ -458,7 +455,7 @@ package Avro {
 
     constant type = "enum";
 
-    has List $!sym;
+    has List $.sym;
     
     submethod BUILD(Associative :$hash) {
       X::Avro::Enum.new(:note("Requires symbols")).throw() unless $hash{'symbols'}:exists;
@@ -474,14 +471,12 @@ package Avro {
       $!native{'symbols'} = $!sym;
     }
 
-    method is_valid_data ($data){
-      my $result = $!sym.first-index: { ($^a eq $data) }; 
+    method is_valid_default(Str $str){
+      my $result = $!sym.first-index: { ($^a eq $str) }; 
       return $result.defined; 
     }
 
-    method is_valid_default(Str $str){
-      return self.is_valid_data($str);
-    }
+    method type (--> Str) { type }
 
   }
 
@@ -492,9 +487,9 @@ package Avro {
 
   class Fixed is NamedComplex does Schema {
 
-    has Int $!size;
-
     constant type = "fixed";
+
+    has Int $.size;
 
     submethod BUILD(Associative :$hash){
       X::Avro::Fixed.new(:note("Requires size")).throw() unless $hash{'size'}:exists;
@@ -504,13 +499,11 @@ package Avro {
       $!native{'namespace'} = self.namespace() unless self.namespace() eq "";
     }
 
-    method is_valid_data ($data){
-      return True;
+    method is_valid_default(Str:D $str){
+      $str.codes() == $!size
     }
 
-    method is_valid_default(Str:D $str){
-      return self.is_valid_data($str);
-    }
+    method type (--> Str) { return type }
   }
 
 
