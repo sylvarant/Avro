@@ -8,8 +8,6 @@ use Avro::Auxiliary;
 # Test Setup
 #======================================
 
-my $path = 'testing';
-
 my $encoder = Avro::BinaryEncoder.new();
 my $decoder = Avro::BinaryDecoder.new();
 
@@ -71,15 +69,9 @@ plan +@schemas;
 #======================================
 
 for @zipped -> $schema, $data {
-  my $write = $path.IO.open(:w);
-  my $result = $encoder.encode($schema,$data);
-  write_list($write,$result);
-  $write.close();
-  my $read = $path.IO.open(:r);
-  my $res = $decoder.decode($schema,$read);
+  my Blob $result = $encoder.encode($schema,$data);
+  my $res = $decoder.decode($schema,$result);
   is-deeply $res, $data, to_str($data) ~ " -> correctly encoded & decoded as:"~ $schema.type;
-  $read.close();
-  unlink $path;
 }
 
 

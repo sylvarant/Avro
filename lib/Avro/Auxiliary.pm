@@ -11,13 +11,18 @@ package Avro {
     method message { "Something went wrong" }
   }
 
+  class X::Avro::BlobStream is AvroException {
+    has Str $.note;
+    method message { "BlobStream failure: $!note" }
+  }
+
 
   #======================================
   # improved .Str
   #  -- resolves silly warnings
   #======================================
   
-  proto to_str(Mu --> Str) is export { * }
+  proto to_str(Mu --> Str) is export is pure { * }
    
   multi sub to_str(Associative:D $hash)  {
     ($hash.kv.map: -> $k,$v { to_str($k) ~ " => " ~ to_str($v) }).join(",");
@@ -37,7 +42,7 @@ package Avro {
   #======================================
 
   # write out
-  multi sub write_list(IO::Handle $h, Positional:D $arr) is export {
+  multi sub write_list(IO::Handle $h, Positional:D $arr) is export { #deprecated
     for $arr.list -> $blob {
       $h.write($blob);
     }
@@ -46,12 +51,68 @@ package Avro {
 #  multi sub write_list(IO::Handle $h, Any:U $any) { } #needed ?
 
   # compute byte size
-  multi sub bytes_list(Positional:D $arr --> Int) is export {
+  multi sub bytes_list(Positional:D $arr --> Int) is export { #deprecated
     my Int $size = 0;
     for $arr.list -> $blob {
       $size += $blob.elems(); # if $blob ~~ Blob;
     }
     $size
+  }
+
+
+  #======================================
+  # Blob Stream
+  #======================================
+  class BlobStream is export {
+
+    has Int $!index;
+    has Int $!size;
+    has Buf $!stream;
+
+    multi method new(){
+      self.bless( blob => pack("") );
+    }
+
+    multi method new(Blob :$blob) {
+      self.bless( blob => $blob );
+    }
+
+    submethod BUILD(Blob :$blob!) {
+      $!index = 0;
+      $!stream = $blob;
+      $!size = $!stream.elems();
+      CATCH { default { $!size = 0 } } #empty buffers become undefined?
+    }
+
+    method !resize() {
+      $!stream = $!stream.subbuf($!index,$!size); 
+      $!index = 0;
+      $!size = $!stream.elems();
+    }
+
+    method read(Int $i) {
+      X::Avro::BlobStream.new(:note("Out of Bounds")).throw() if ($!index + $i) > $!size;
+      my Buf $r = $!stream.subbuf($!index,$i); 
+      $!index += $i;
+    #  self!resize if ($!index > ($!size / 2));
+      return $r;
+    }
+
+    method append(Blob $blob) {
+      if $!size == 0 {
+        $!stream = $blob;
+      } else {
+        try {
+          $!stream = $!stream ~ $blob;
+        }
+      }
+      $!size = $!stream.elems();
+      CATCH { default { $!size = 0 } } # same issue
+    }
+
+    method blob () {
+      return $!stream;
+    }
   }
 
 
