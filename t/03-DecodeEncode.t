@@ -4,7 +4,6 @@ use lib 'lib';
 use Avro; 
 use Avro::Auxiliary;
 
-
 #======================================
 # Test Setup
 #======================================
@@ -73,11 +72,12 @@ plan +@schemas;
 
 for @zipped -> $schema, $data {
   my $write = $path.IO.open(:w);
-  $encoder.encode($schema,$write,$data);
+  my $result = $encoder.encode($schema,$data);
+  write_list($write,$result);
   $write.close();
   my $read = $path.IO.open(:r);
   my $res = $decoder.decode($schema,$read);
-  is-deeply $res,$data,to_str($data) ~ " -> correctly encoded & decoded as:"~ $schema.type;
+  is-deeply $res, $data, to_str($data) ~ " -> correctly encoded & decoded as:"~ $schema.type;
   $read.close();
   unlink $path;
 }

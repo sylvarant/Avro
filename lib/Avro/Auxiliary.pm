@@ -31,6 +31,30 @@ package Avro {
     ($data.gist() ~~ Any.gist() ?? "Any" !! $data.Str)
   }
 
+  
+  #======================================
+  # Dealing with arrays of blobs
+  #======================================
+
+  # write out
+  multi sub write_list(IO::Handle $h, Positional:D $arr) is export {
+    for $arr.list -> $blob {
+      $h.write($blob);
+    }
+  }
+
+#  multi sub write_list(IO::Handle $h, Any:U $any) { } #needed ?
+
+  # compute byte size
+  multi sub bytes_list(Positional:D $arr --> Int) is export {
+    my Int $size = 0;
+    for $arr.list -> $blob {
+      $size += $blob.elems(); # if $blob ~~ Blob;
+    }
+    $size
+  }
+
+
   #======================================
   # Low-level representations
   #======================================

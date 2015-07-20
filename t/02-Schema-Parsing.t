@@ -56,7 +56,7 @@ my $avro_exp2 = Q<<{
  "type": "record",
  "name": "User",
  "fields": [
-     {"name": "name", "order" : "ascending", "type": { "type" : "string" }}
+     {"name": "name", "type": { "type" : "string" }}
  ]
 }>>;
 

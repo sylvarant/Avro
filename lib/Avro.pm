@@ -1,7 +1,7 @@
 =begin pod
 =head1 Avro
-C<Avro> is a minimalistic module that encodes and decode Avro.
-It supports JSON and Binary decoding/encoding.
+C<Avro> is a minimalistic module that encodes and decodes Avro.
+It supports aims to support Binary and JSON decoding/encoding.
 =end pod
 
 use v6;

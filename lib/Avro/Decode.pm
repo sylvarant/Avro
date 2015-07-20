@@ -154,12 +154,11 @@ package Avro{
 
     method decode(Avro::Schema $schema, IO::Handle $handle) {  
       # TODO check handle
-      my $r; 
-      try {
-       $r = self.decode_schema($schema,$handle); 
+      #X::Avro::DecodeFail.new(:note("End of file")).throw() if $handle.eof;
+      {
+        return self.decode_schema($schema,$handle); 
+        CATCH { default { X::Avro::DecodeFail.new(:schema($schema)).throw() }}
       }
-      CATCH { default { X::Avro::DecodeFail.new(:schema($schema)).throw() }}
-      return $r;
     };
 
   };

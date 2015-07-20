@@ -220,8 +220,8 @@ package Avro {
       }
 
       # build native representation
-      my Str $o = order_str($!order);
-      $!native = { 'name' => $!name, 'type' => $!type.native() , 'order' => $o}; 
+      $!native = { 'name' => $!name, 'type' => $!type.native()};  
+      $!native{'order'} = order_str($!order)  unless $!order == Order::ascending; 
       $!native{'aliases'} = self.aliases() if self.aliases.defined;
     }
   }
