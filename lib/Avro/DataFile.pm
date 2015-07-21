@@ -45,7 +45,7 @@ package Avro {
   #   constructors of reader and writer
   #======================================
 
-  enum Encoding <JSON Binary>; 
+  enum Encoding is export <JSON Binary>; 
 
 
   #== Enum ==============================
@@ -53,7 +53,7 @@ package Avro {
   #   -- the codec, used by the writer
   #======================================
 
-  enum Codec <null deflate>;
+  enum Codec is export <null deflate>;
 
 
   #== Class =============================
@@ -193,7 +193,16 @@ package Avro {
       return $!decoder.decode($!buffer,$!schema,); 
     }
 
+    method eof() {
+      $!handle.eof and $!buffer.eof()
+    }
+
     method slurp() { * }
+
+    method close() {
+      # close buffer ?
+      $!handle.close();
+    }
 
   }
 

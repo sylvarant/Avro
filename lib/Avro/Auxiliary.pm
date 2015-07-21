@@ -66,6 +66,7 @@ package Avro {
   #======================================
 
   role Stream is export {
+   
     method read (Int:D --> Blob) { ... }
     method eof (--> Bool) { ... }
   }
@@ -90,6 +91,9 @@ package Avro {
   
   # To be used by the Decoder & Encoder
   class BlobStream does Stream is export {
+
+    # todo paramerize
+    constant blocksize = 128;
 
     has Int $!index;
     has Int $!size;
@@ -120,7 +124,7 @@ package Avro {
       X::Avro::BlobStream.new(:note("Out of Bounds")).throw() if ($!index + $i) > $!size;
       my Buf $r = $!stream.subbuf($!index,$i); 
       $!index += $i;
-    #  self!resize if ($!index > ($!size / 2));
+      self!resize if ($!index > blocksize);
       return $r;
     }
 
@@ -141,7 +145,7 @@ package Avro {
     }
 
     method eof (--> Bool) {
-      $!size == 0
+      $!size == $!index
     }
   }
 

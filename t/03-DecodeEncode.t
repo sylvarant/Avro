@@ -52,10 +52,10 @@ my Avro::Record $record_schema2 = parse-schema($record_ex2);
 
 my @schemas =  Avro::Boolean.new(), Avro::Boolean.new() , Avro::Null.new(), Avro::Integer.new(), 
   Avro::Integer.new(), Avro::Long.new(), Avro::Bytes.new(), Avro::String.new(), Avro::String.new(),
-  Avro::Float.new(),Avro::Double.new(),$enum_schema, $array_schema, $union_schema,$union_schema,
+  Avro::Float.new(),Avro::Double.new(),$enum_schema, $array_schema, $array_schema, $union_schema,$union_schema,
   $union_schema,$fixed_schema, $map_schema,$map_schema2,$record_schema, $record_schema2, $record_schema2;
 my @datas =  True, False, Any, 56, -668, (1 +< 60),"00FF","Hello Me", 'møp', 2.5, 8.375, "HEARTS",
-  [<cabana banana mango>],Any, 5, "string","12345678", { "key1" => 12, "key2" => 23 },
+  [<cabana banana mango>], [], Any, 5, "string","12345678", { "key1" => 12, "key2" => 23 },
   { "key1" => "key", "key2" => 23 }, { "a" => 27, b => "foo"}, {"name" => "Alyssa", "favorite_number" =>  256, favorite_color => Any},
   {"name" => "Ben", "favorite_number" => 7, "favorite_color" => "red"};
 my @zipped = (@schemas Z @datas);
