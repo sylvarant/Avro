@@ -36,6 +36,7 @@ package Avro {
   my Avro::Fixed $fixed_s = parse({"type"=> "fixed", "name"=> "Sync", "size"=> 16});
 
   constant magic = "Obj\x01";
+  constant marker_size = 16;
 
 
   #== Enum ==============================
@@ -68,7 +69,7 @@ package Avro {
     has Avro::Schema $!schema;
     has Codec $!codec;
     has Blob $!syncmark;
-    has List $!buffer;
+    has BlobStream $!buffer;
     has Int $!blocksize;
     has Int $!buffersize;
     has Int $!count;
@@ -92,7 +93,8 @@ package Avro {
       my @rands = (0..255).map: { $_.chr }; # byte range
       my @range = (1..16);
       my $sync = (@range.map:{ @rands.pick(1) }).join("");
-      $!syncmark = pop ($encoder.encode($fixed_s,$sync));
+      $!syncmark = $encoder.encode($fixed_s,$sync);
+      $!buffer = BlobStream.new();
       $!buffersize = 0;
       $!count = 0;
       $!handle = $handle;
@@ -102,27 +104,27 @@ package Avro {
       my %metahash = 'avro.schema' => $schema.to_json(), 'avro.codec' => ~$codec;
       %metahash.push( $metadata.kv ) if $metadata.kv.elems() != 0;
       my %header =  magic => magic, sync => $sync, meta => %metahash;
-      write_list($!handle,$!encoder.encode($schema_h,%header)); #todo switch based on encoding ?
+      $!handle.write($!encoder.encode($schema_h,%header)); #todo switch based on encoding ?
     }
 
     method append(Mu $data){
-      my @data = $!encoder.encode($!schema,$data);
-      my $size = bytes_list(@data);  
+      my Blob $blob = $!encoder.encode($!schema,$data);
+      my $size = $blob.elems();  
       self!write_block if ($!buffersize + $size) > $!blocksize; 
       $!count++;
       $!buffersize += $size;
-      push $!buffer, @data;
+      $!buffer.append($blob);
     }
 
     method !write_block {
       return unless $!buffersize > 0;
-      write_list($!handle,$!encoder.encode(Avro::Long.new(),$!count)); 
-      write_list($!handle,$!encoder.encode(Avro::Long.new(),$!buffersize));
-      write_list($!handle,$!buffer);
+      $!handle.write($!encoder.encode(Avro::Long.new(),$!count)); 
+      $!handle.write($!encoder.encode(Avro::Long.new(),$!buffersize));
+      $!handle.write($!buffer.blob);
       $!handle.write($!syncmark);
       $!buffersize = 0;
       $!count = 0;
-      $!buffer = ().List;
+      $!buffer = BlobStream.new();
     }
 
     method close {
@@ -145,6 +147,7 @@ package Avro {
     has Codec $.codec;
     has Str $.syncmark;
     has Associative $.meta;
+    has BlobStream $!buffer;
 
     multi method new(IO::Handle :$handle!, Encoding :$encoding? = Encoding::Binary) {
       my Avro::Decoder $decoder; 
@@ -158,7 +161,8 @@ package Avro {
     submethod BUILD(IO::Handle :$handle, Avro::Decoder :$decoder!){
       $!handle = $handle;
       $!decoder = $decoder;
-      my %header = $decoder.decode($schema_h,$handle);
+      $!buffer = BlobStream.new();
+      my %header = $decoder.decode($handle,$schema_h);
       X::Avro::DataFileReader.new(:note("Incorrect magic bytes")).throw() 
         unless %header{'magic'} ~~ magic;
       $!syncmark = %header{'sync'};
@@ -175,12 +179,18 @@ package Avro {
     }
 
     method !read_block() {
-      my Int $count = $!decoder.decode(Avro::Long.new(),$!handle);
-      my Int $size  = $!decoder.decoder(Avro::Long.new(),$!handle);
+      X::Avro::DataFileReader(:note("eof")).throw() if $!handle.eof();
+      my Int $count = $!decoder.decode($!handle,Avro::Long.new());
+      my Int $size  = $!decoder.decode($!handle,Avro::Long.new());
+      my Blob $blob = $!handle.read($size);
+      my Str $marker = $!decoder.decode($!handle.read(marker_size),$fixed_s);
+      X::Avro::DataFileReader.new(:note("Incorrect sync marker: $marker")).throw() unless $marker ~~ $!syncmark;
+      $!buffer = BlobStream.new(:blob($blob)); 
     }
 
     method read() { 
-      return $!decoder.decode($!schema,$!handle); 
+      self!read_block if $!buffer.eof();
+      return $!decoder.decode($!buffer,$!schema,); 
     }
 
     method slurp() { * }

@@ -77,8 +77,8 @@ package Avro {
     has Iterable $!native;
     method native(--> Iterable) { return $!native; } 
     method to_json(--> Str) { to-json(self.native()); }
-    method is_valid_default(Mu --> Bool) { ... }
-    method type(--> Str) { ... }
+    method is_valid_default(Mu --> Bool) { False }
+    method type(--> Str) { "(Schema)" }
   }
 
   # parse produces Schema

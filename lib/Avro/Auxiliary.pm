@@ -61,9 +61,35 @@ package Avro {
 
 
   #======================================
-  # Blob Stream
+  # Streams
+  # -- Missing in perl6 lib
   #======================================
-  class BlobStream is export {
+
+  role Stream is export {
+    method read (Int:D --> Blob) { ... }
+    method eof (--> Bool) { ... }
+  }
+
+  # To be used by the Decoder
+  # A simple wrapper
+  class HandleStream does Stream is export {
+
+    has IO::Handle $!handle;
+
+    submethod BUILD(IO::Handle :$handle){
+      $!handle = $handle;
+    }
+
+    method read(Int $i) {
+      $!handle.read($i);
+    }
+
+    method eof(--> Bool) { $!handle.eof }
+
+  }
+  
+  # To be used by the Decoder & Encoder
+  class BlobStream does Stream is export {
 
     has Int $!index;
     has Int $!size;
@@ -110,8 +136,12 @@ package Avro {
       CATCH { default { $!size = 0 } } # same issue
     }
 
-    method blob () {
+    method blob (--> Blob) {
       return $!stream;
+    }
+
+    method eof (--> Bool) {
+      $!size == 0
     }
   }
 

@@ -10,8 +10,8 @@ package Avro{
   #======================================
 
   class X::Avro::DecodeFail is Avro::AvroException {
-    has Avro::Schema $.schema;
-    method message { "Failed to decode "~$!schema.type() }
+    has Str $.note;
+    method message { "Failed to decode "~$!note }
   }
 
 
@@ -20,7 +20,9 @@ package Avro{
   #======================================
 
   role Decoder {
-    method decode(Avro::Schema, Blob:D --> Mu:D) { * };
+    method decode(Mu , Avro::Schema --> Mu:D) { ... };
+ #   multi method decode(IO::Handle:D $handle, Avro::Schema $schema --> Mu:D) { ... }; see bug ticker #125658
+ #   multi method decode(Mu:D, Avro::Schema  --> Mu:D) { ... };
   }
 
 
@@ -31,7 +33,7 @@ package Avro{
   class BinaryDecoder does Decoder { 
 
     # integers and longs are encode as variable sized zigzag numbers
-    sub decode_long(BlobStream $stream){
+    sub decode_long(Stream $stream){
       my @arr = ();
       my int $byte;
       repeat {
@@ -41,7 +43,7 @@ package Avro{
       return from_zigzag(from_varint(@arr));
     }
 
-    multi submethod decode_schema(Avro::Record $schema,BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Record $schema,Stream $stream) { 
       my %hash;
       for $schema.fields.list -> $field {
         %hash{$field.name} = self.decode_schema($field.type,$stream);
@@ -49,7 +51,7 @@ package Avro{
       return %hash;
     }   
 
-    multi submethod decode_schema(Avro::Array $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Array $schema, Stream $stream) { 
       my Int $size = decode_long($stream);
       my @arr = ();
       while $size {
@@ -61,10 +63,10 @@ package Avro{
       return @arr
     }   
 
-    multi submethod decode_schema(Avro::Map $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Map $schema, Stream $stream) { 
       my Int $size = decode_long($stream);
       my %hash;
-      my Avro::Schema $keyschema = Avro::String.new();
+       my Avro::Schema $keyschema = Avro::String.new();
       while $size {
         for (1..$size) -> $i {
           my Str $key = self.decode_schema($keyschema,$stream);
@@ -76,18 +78,18 @@ package Avro{
       return %hash;
     }   
 
-    multi submethod decode_schema(Avro::Enum $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Enum $schema, Stream $stream) { 
       my int $result = decode_long($stream);
       $schema.sym[$result];
     }   
 
-    multi submethod decode_schema(Avro::Union $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Union $schema, Stream $stream) { 
       my Int $num = decode_long($stream);
       my Avro::Schema $type = $schema.types[$num];
       self.decode_schema($type,$stream);
     }   
 
-    multi submethod decode_schema(Avro::Fixed $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Fixed $schema, Stream $stream) { 
       my @arr = ();
       for (1..$schema.size) -> $i {
         push(@arr,$stream.read(1).unpack("C").chr);
@@ -95,20 +97,20 @@ package Avro{
       @arr.join("");
     }   
 
-    multi submethod decode_schema(Avro::Null $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Null $schema, Stream $stream) { 
       #my $r = $stream.read(1).unpack("C"); 
       #if $r == 0 { Any }
       #else { X::Avro::DecodeFail.new(:schema($schema)).throw()  }
       Any 
     }   
 
-    multi submethod decode_schema(Avro::String $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::String $schema, Stream $stream) { 
       my int $size = decode_long($stream); 
       my Blob $r = $stream.read($size);
       $r.decode()
     }   
 
-    multi submethod decode_schema(Avro::Bytes $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Bytes $schema, Stream $stream) { 
       my int $size = decode_long($stream); 
       my @arr = ();
       for 1..$size -> $i {
@@ -117,7 +119,7 @@ package Avro{
       @arr.join("");
     }   
 
-    multi submethod decode_schema(Avro::Boolean $schema, BlobStream $stream) {  
+    multi submethod decode_schema(Avro::Boolean $schema, Stream $stream) {  
       my $r = $stream.read(1).unpack("C"); 
       given $r {
         when 0  { False }
@@ -128,15 +130,15 @@ package Avro{
       }
     }   
 
-    multi submethod decode_schema(Avro::Integer $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Integer $schema, Stream $stream) { 
       decode_long($stream);   
     }   
 
-    multi submethod decode_schema(Avro::Long $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Long $schema, Stream $stream) { 
       decode_long($stream);
     }   
 
-    multi submethod decode_schema(Avro::Float $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Float $schema, Stream $stream) { 
       my @arr = ();
       for 1..4 -> $i {
         push(@arr,$stream.read(1).unpack("C"));
@@ -144,7 +146,7 @@ package Avro{
       from_floatbits(int_from_bytes(@arr));
     }   
 
-    multi submethod decode_schema(Avro::Double $schema, BlobStream $stream) { 
+    multi submethod decode_schema(Avro::Double $schema, Stream $stream) { 
       my @arr = ();
       for 1..8 -> $i {
         push(@arr,$stream.read(1).unpack("C"));
@@ -152,15 +154,25 @@ package Avro{
       from_doublebits(int_from_bytes(@arr));
     }   
 
-    method decode(Avro::Schema $schema, Blob $blob) {  
-      # TODO check stream
-      #X::Avro::DecodeFail.new(:note("End of file")).throw() if $stream.eof;
-      {
-        my BlobStream $stream = BlobStream.new(:blob($blob));
-        return self.decode_schema($schema,$stream); 
-        CATCH { default { X::Avro::DecodeFail.new(:schema($schema)).throw() }}
-      }
-    };
+    multi submethod dispatch(Stream $stream, Avro::Schema $schema) {
+      #X::Avro::DecodeFail.new(:note("Empty Stream")).throw() if $stream.eof;
+      return self.decode_schema($schema,$stream); 
+    }
+
+    multi submethod dispatch(IO::Handle:D $handle, Avro::Schema $schema) {
+      my HandleStream $stream = HandleStream.new(:handle($handle));
+      self.dispatch($stream,$schema);
+    }
+
+    multi submethod dispatch(Blob $blob, Avro::Schema $schema) {  
+      my BlobStream $stream = BlobStream.new(:blob($blob));
+      self.dispatch($stream,$schema);
+    }
+
+    method decode(Mu $input, Avro::Schema $schema) { # dispatch within class due to perl6 bug #125658
+      return self.dispatch($input,$schema);
+      CATCH { default { X::Avro::DecodeFail.new(:note($schema.type)).throw() }}
+    }
 
   };
 
@@ -171,6 +183,7 @@ package Avro{
 
   class JSONDecoder does Decoder {
   
+    method decode(Mu:D , Avro::Schema --> Mu:D) { "TODO" };
   
   };
 

@@ -4,7 +4,7 @@ use lib 'lib';
 use Avro; 
 use Avro::DataFile;
 
-plan 3;
+plan 5;
 
 #======================================
 # Test Setup
@@ -52,10 +52,11 @@ lives-ok { $writer.append(%data); }, "Appended data";
 $writer.close;
 $fh = $path.IO.open(:r);
 my %result;
-#$reader = Avro::DataFileReader.new(:handle($fh)); 
-#lives-ok { %result = $writer.read(); }, "Data read from file";
-#is-deeply %data, %result, "Correct data read";
-#$fh.close;
+$reader = Avro::DataFileReader.new(:handle($fh)); 
+lives-ok { %result = $reader.read(); }, "Data read from file";
+%data{'favorite_color'} = Any;
+is-deeply %data, %result, "Correct data read";
+$fh.close;
 
 # clean up
 unlink $path;

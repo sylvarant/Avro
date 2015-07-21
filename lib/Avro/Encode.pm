@@ -75,7 +75,6 @@ package Avro{
         }
       }
       $stream.append(encode_long(0));
-      say $stream.blob;
       $stream.blob
     }   
 
@@ -136,7 +135,6 @@ package Avro{
 
     multi submethod encode_schema(Avro::Bytes $schema, Str:D $str) { 
       my BlobStream $stream = BlobStream.new(:blob(encode_long($str.codes())));
-      say pack(template($str.codes()),$str.ords()); 
       $stream.append( pack(template($str.codes()),$str.ords()) );
       $stream.blob
     }

@@ -70,7 +70,7 @@ plan +@schemas;
 
 for @zipped -> $schema, $data {
   my Blob $result = $encoder.encode($schema,$data);
-  my $res = $decoder.decode($schema,$result);
+  my $res = $decoder.decode($result,$schema);
   is-deeply $res, $data, to_str($data) ~ " -> correctly encoded & decoded as:"~ $schema.type;
 }
 
