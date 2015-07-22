@@ -238,6 +238,16 @@ package Avro {
     return ($exp,$mantissa);
   }
 
+  sub binary_reverse (Int $input, Int $bytes) {
+    my Int $final = 0;
+    my Int $iter = $input;
+    loop (my $i = 0; $i < $bytes; $i++) {
+      $final = $final +| ( 1 +< ($bytes - ($i +1))) if $iter +& 0x1;
+      $iter = $iter +> 1;
+    }
+    $final
+  }
+
   sub to_ieee(Int $nan, Int $inf, Int $ninf, Int $fsize, Int $expsize, 
     Rat $rat --> Int) {
 
@@ -270,21 +280,33 @@ package Avro {
         my $mask = 1;
         my $bytes = 0;
         my $neg = 0;
-        until $comma == 0.0 or ($fsize - $plus - $bytes) == 0  {
+        my $maxsize = ($fsize - $plus);
+        until $comma == 0 or $bytes == 128 {
           $bytes++;
-          $comma *= 2.0;
-          if $comma.truncate > 0 {
-           $neg = $bytes if $neg == 0; 
-           $fraction = $fraction +| $mask;
+          $comma *= 2;
+          if $comma >= 1.0 {
+            $neg = $bytes if $neg == 0; 
+            $fraction = $fraction +| $mask;
+            $comma = $comma - 1;
           }
-          $comma = $comma - ($comma.truncate).FatRat;
           $mask = $mask +< 1;
         }
-        my Int $final = 0;
-        loop (my $i = 0; $i < $bytes; $i++) {
-          $final = $final +| ( 1 +< ($bytes - ($i +1))) if $fraction +& 0x1;
-          $fraction = $fraction +> 1;
+        
+        my Int $final = binary_reverse($fraction,$bytes);
+        if $bytes > $maxsize { #round to nearest even
+
+          my $rest = $final +& ((1 +< ($bytes - $maxsize)) - 1);
+          $final =  ($final +> ($bytes - $maxsize));
+          my $target = (1 +< ($bytes - $maxsize - 1));
+
+          if $rest > $target {
+            $final += 1;
+          } elsif $rest == $target {
+            $final += 1 if $final +& 0x1;
+          }
+          $bytes = $maxsize;
         }
+
         my int $f = 0; 
         my $exp = $plus > 0 ?? $plus !! -$neg;
         $f = $f +| $final;

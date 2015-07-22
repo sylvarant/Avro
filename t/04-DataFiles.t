@@ -4,7 +4,7 @@ use lib 'lib';
 use Avro; 
 use Avro::DataFile;
 
-plan 9;
+plan 10;
 
 #======================================
 # Test Setup
@@ -66,7 +66,7 @@ $fh.close;
 $fh = $path.IO.open(:w);
 %data = "name" => "Aaron","number" => 1 , list => [];
 $writer = Avro::DataFileWriter.new(:handle($fh),:schema($schema));
-my Int $count = 10;
+my Int $count = 20;
 loop (my $i = 0; $i < $count; $i++) {
   $writer.append(%data);
 }
@@ -79,6 +79,25 @@ repeat {
 } until $reader.eof;
 is $count,0,"Eof work correctly";
 $fh.close;
+
+
+#======================================
+# Test :: slurp
+#======================================
+
+$fh = $path.IO.open(:w);
+%data = "name" => "Aaron","number" => 1 , list => [];
+$writer = Avro::DataFileWriter.new(:handle($fh),:schema($schema));
+$count = 20;
+loop ($i = 0; $i < $count; $i++) {
+  $writer.append(%data);
+}
+$writer.close;
+$fh = $path.IO.open(:r);
+$reader = Avro::DataFileReader.new(:handle($fh)); 
+my @arr = $reader.slurp;
+$fh.close;
+is +@arr,$count, "Slurp works";
 
 
 #======================================

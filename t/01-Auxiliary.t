@@ -40,7 +40,10 @@ is-deeply to_floatbits(25.0),0x41c80000,"Encoded 25 to float correctly";
 is-deeply to_floatbits(-2.0),0xc0000000,"Encoded -2.0 to float correctly";
 is-deeply from_floatbits(to_floatbits(12.375)),12.375,"Reversed 12.375 correctly";
 is-deeply from_floatbits(to_floatbits(2.5)),2.5,"Reversed 2.5 Correctly";
-#say from_floatbits(to_floatbits(2.01));
+
+#say to_floatbits(0.02);
+#say from_floatbits(to_floatbits(0.02));
+
 #is-deeply from_floatbits(to_floatbits(2.02)),2.02;
 is-deeply from_floatbits(to_floatbits(0.5)),0.5, "Reversed 0.5 correctly";
 is-deeply from_floatbits(to_floatbits(1.0)),1.0, "Reversed 1 correctly";

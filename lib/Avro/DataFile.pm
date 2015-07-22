@@ -197,7 +197,14 @@ package Avro {
       $!handle.eof and $!buffer.eof()
     }
 
-    method slurp() { * }
+    method slurp() { 
+      my @arr;  
+      repeat {
+        my Mu $l = self.read; 
+        push @arr, $l;
+      } until self.eof;
+      @arr
+    }
 
     method close() {
       # close buffer ?
