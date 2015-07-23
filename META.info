@@ -12,6 +12,6 @@
       "Avro::Datafile":   "lib/Avro/Datafile.pm",
       "Avro::Auxiliary":  "lib/Avro/Auxiliary.pm"
     },
-    source-url" : "git://github.com/sylvarant/Avro.git"
+    "source-url" : "git://github.com/sylvarant/Avro.git"
 }
 
