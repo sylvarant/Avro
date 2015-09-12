@@ -158,7 +158,7 @@ package Avro {
       $!name = $hash{'name'};
       $!fullname = $!name;
 
-      my Seq $ls = $!name.split('.');
+      my List $ls = $!name.split('.').values;
       for $ls.values -> $n {
         X::Avro::FaultyName.new(:source($n)).throw() unless self.valid_name($n);
       }
