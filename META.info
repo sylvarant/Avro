@@ -7,9 +7,9 @@
     "provides" : {
       "Avro":             "lib/Avro.pm",
       "Avro::Schema":     "lib/Avro/Schema.pm",
-      "Avro::Encode":     "lib/Avro/Encode.pm6",
+      "Avro::Encode":     "lib/Avro/Encode.pm",
       "Avro::Decode":     "lib/Avro/Decode.pm",
-      "Avro::Datafile":   "lib/Avro/Datafile.pm",
+      "Avro::DataFile":   "lib/Avro/DataFile.pm",
       "Avro::Auxiliary":  "lib/Avro/Auxiliary.pm"
     },
     "source-url" : "git://github.com/sylvarant/Avro.git"
