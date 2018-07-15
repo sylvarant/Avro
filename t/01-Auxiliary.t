@@ -51,7 +51,7 @@ is-deeply from_floatbits(to_floatbits(1.0)),1.0, "Reversed 1 correctly";
 is-deeply from_floatbits(int_from_bytes(int_to_bytes(to_floatbits(25.0),4))),25.0,"converted to byte arrays correctly";
 
 is-deeply from_doublebits(0x3ff0000000000000),1.0,"Reading bytes to double works for 1";
-is-deeply from_doublebits(0x3ff0000000000002),1.00000000000000044,"Reading bytes for small number works";
+is-deeply from_doublebits(0x3ff0000000000002).round(0.00000000000000001),1.00000000000000044,"Reading bytes for small number works";
 is-deeply from_doublebits(to_doublebits(0.5)),0.5, "Reversed 0.5 correctly";
 is-deeply from_doublebits(to_doublebits(2.5)),2.5,"Reversed 2.5 Correctly";
 
