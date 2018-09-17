@@ -4,6 +4,8 @@ use Avro::Auxiliary;
 use Avro::Schema;
 use experimental :pack;
 
+#use trace; 
+
 package Avro{
 
   #======================================
@@ -51,8 +53,6 @@ package Avro{
     }
 
     multi submethod encode_schema(Avro::Record $schema, Associative:D $hash) { 
-    #   X::Avro::EncodeFail.new(:schema($schema),:data($hash)).throw() 
-    #    unless $schema.is_valid_default($hash);
       my BlobStream $stream = BlobStream.new();
       for $schema.fields.list -> $field {
         my $data = $hash{$field.name};
@@ -165,7 +165,6 @@ package Avro{
 
     method encode(Avro::Schema $schema, Mu $data) {  
       try {
-      #  say $schema.WHAT.gist();
         return self.encode_schema($schema,$data); 
       }
       CATCH { default { say $_; X::Avro::EncodeFail.new(:schema($schema),:data($data)).throw() }}

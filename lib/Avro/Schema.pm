@@ -437,7 +437,7 @@ package Avro {
 
     # determined by subset of names
     method is_valid_default(Associative:D $hash){
-      ($!fields.map: { $_.name }) ⊆ $hash.keys();
+      $hash.keys() ⊆ ($!fields.map: { $_.name });
     }
 
     method type (--> Str) { type }
